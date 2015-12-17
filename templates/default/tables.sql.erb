@@ -1,0 +1,169 @@
+CREATE TABLE `project` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `inode_pid` INT(11) NOT NULL,
+  `inode_name` VARCHAR(255) NOT NULL,
+  `projectname` VARCHAR(100) NOT NULL,
+  `username` VARCHAR(150) NOT NULL,
+  `created` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `retention_period` DATE DEFAULT NULL,
+  `ethical_status` VARCHAR(30) DEFAULT NULL,
+  `archived` TINYINT(1) DEFAULT '0',
+  `deleted` TINYINT(1) DEFAULT '0',
+  `description` VARCHAR(2000) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY(`projectname`),
+  UNIQUE KEY(`inode_pid`, `inode_name`),
+  FOREIGN KEY (`inode_pid`,`inode_name`) REFERENCES `hops`.`hdfs_inodes`(`parent_id`,`name`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
+
+-- Metadata --------------
+-- ------------------------
+
+CREATE TABLE `meta_templates` (
+  `templateid` INT(11) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(250) NOT NULL,
+  PRIMARY KEY (`templateid`)
+) ENGINE=ndbcluster;
+
+CREATE TABLE `meta_field_types` (
+  `id` MEDIUMINT(9) NOT NULL AUTO_INCREMENT,
+  `description` VARCHAR(50) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=ndbcluster;
+
+CREATE TABLE `meta_tables` (
+  `tableid` INT(11) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) DEFAULT NULL,
+  `templateid` INT(11) NOT NULL,
+  PRIMARY KEY (`tableid`),
+  FOREIGN KEY (`templateid`) REFERENCES `meta_templates` (`templateid`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
+
+CREATE TABLE `meta_fields` (
+  `fieldid` INT(11) NOT NULL AUTO_INCREMENT,
+  `maxsize` INT(11) DEFAULT NULL,
+  `name` VARCHAR(255) DEFAULT NULL,
+  `required` SMALLINT(6) DEFAULT NULL,
+  `searchable` SMALLINT(6) DEFAULT NULL,
+  `tableid` INT(11) DEFAULT NULL,
+  `type` VARCHAR(255) DEFAULT NULL,
+  `description` VARCHAR(250) NOT NULL,
+  `fieldtypeid` MEDIUMINT(11) NOT NULL,
+  `position` MEDIUMINT(11) DEFAULT '0',
+  PRIMARY KEY (`fieldid`),
+  FOREIGN KEY (`tableid`) REFERENCES `meta_tables` (`tableid`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  FOREIGN KEY (`fieldtypeid`) REFERENCES `meta_field_types` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
+
+CREATE TABLE `meta_field_predefined_values` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `fieldid` INT(11) NOT NULL,
+  `valuee` VARCHAR(250) NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`fieldid`) REFERENCES `meta_fields` (`fieldid`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
+
+CREATE TABLE `meta_tuple_to_file` (
+  `tupleid` INT(11) NOT NULL AUTO_INCREMENT,
+  `inodeid` INT(11) NOT NULL, -- pretty necessary for the rivers to work
+  `inode_pid` INT(11) NOT NULL,
+  `inode_name` VARCHAR(255) NOT NULL,
+  PRIMARY KEY (`tupleid`),
+  FOREIGN KEY (`inode_pid`, `inode_name`) REFERENCES `hops`.`hdfs_inodes` (`parent_id`, `name`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
+
+CREATE TABLE `meta_raw_data` (
+  `fieldid` INT(11) NOT NULL,
+  `tupleid` INT(11) NOT NULL,
+  PRIMARY KEY (`fieldid`, `tupleid`),
+  FOREIGN KEY (`fieldid`) REFERENCES `meta_fields` (`fieldid`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  FOREIGN KEY (`tupleid`) REFERENCES `meta_tuple_to_file` (`tupleid`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
+
+CREATE TABLE `meta_data` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `data` LONGTEXT NOT NULL,
+  `fieldid` INT(11) NOT NULL,
+  `tupleid` INT(11) NOT NULL,
+  PRIMARY KEY (`id`, `fieldid`, `tupleid`),
+  FOREIGN KEY (`fieldid`, `tupleid`) REFERENCES `meta_raw_data` (`fieldid`, `tupleid`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
+
+CREATE TABLE `meta_template_to_inode` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `template_id` INT(11) NOT NULL,
+  `inode_pid` INT(11) NOT NULL,
+  `inode_name` VARCHAR(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`template_id`) REFERENCES `meta_templates` (`templateid`) ON DELETE CASCADE ON UPDATE NO ACTION,
+  FOREIGN KEY (`inode_pid`,`inode_name`) REFERENCES `hops`.`hdfs_inodes`(`parent_id`,`name`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
+
+CREATE TABLE `meta_inode_basic_metadata` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `inode_pid` INT(11) NOT NULL,
+  `inode_name` VARCHAR(255) NOT NULL,
+  `description` VARCHAR(3000) DEFAULT NULL,
+  `searchable` TINYINT(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY(`id`),
+  UNIQUE KEY (`inode_pid`, `inode_name`),
+  FOREIGN KEY (`inode_pid`, `inode_name`) REFERENCES `hops`.`hdfs_inodes`(`parent_id`, `name`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
+ 
+-- elastic jdbc-importer buffer tables -------
+
+CREATE TABLE `meta_inodes_ops_parents_buffer` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `inodeid` INT(11) NOT NULL,
+  `parentid` INT(11) NOT NULL,
+  `operation` SMALLINT(11) NOT NULL,
+  `logical_time` INT(11) NOT NULL,
+  `processed` TINYINT(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`,`inodeid`,`parentid`)
+) ENGINE=ndbcluster AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+CREATE TABLE `meta_inodes_ops_datasets_buffer` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `inodeid` INT(11) NOT NULL,
+  `parentid` INT(11) NOT NULL,
+  `operation` SMALLINT(11) NOT NULL,
+  `logical_time` INT(11) NOT NULL,
+  `processed` TINYINT(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`,`inodeid`,`parentid`)
+) ENGINE=ndbcluster AUTO_INCREMENT=85 DEFAULT CHARSET=utf8;
+
+CREATE TABLE `meta_inodes_ops_children_pr_buffer` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `inodeid` INT(11) NOT NULL,
+  `parentid` INT(11) NOT NULL,
+  `operation` SMALLINT(11) NOT NULL,
+  `logical_time` INT(11) NOT NULL,
+  `processed` TINYINT(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`,`inodeid`,`parentid`)
+) ENGINE=ndbcluster AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+CREATE TABLE `meta_inodes_ops_children_ds_buffer` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `inodeid` INT(11) NOT NULL,
+  `parentid` INT(11) NOT NULL,
+  `operation` SMALLINT(11) NOT NULL,
+  `logical_time` INT(11) NOT NULL,
+  `processed` TINYINT(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`,`inodeid`,`parentid`)
+) ENGINE=ndbcluster AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+-- Dataset table-------------------------------------------------
+CREATE TABLE `dataset` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `inode_pid` INT(11) NOT NULL,
+  `inode_name` VARCHAR(255) NOT NULL,
+  `projectId` INT(11) NOT NULL,
+  `description` VARCHAR(2000) DEFAULT NULL,
+  `editable` TINYINT(1) NOT NULL DEFAULT '1',
+  `status` TINYINT(1) NOT NULL DEFAULT '1',
+  `searchable` TINYINT(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_dataset` (`inode_pid`,`projectId`,`inode_name`),
+  FOREIGN KEY (`projectId`) REFERENCES `project` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION,
+  FOREIGN KEY (`inode_pid`,`inode_name`) REFERENCES `hops`.`hdfs_inodes` (`parent_id`,`name`) ON DELETE CASCADE ON UPDATE NO ACTION
+) ENGINE=ndbcluster;
