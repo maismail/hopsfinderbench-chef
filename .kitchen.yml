@@ -8,6 +8,7 @@ driver:
     nictype1: "virtio"
   network:
   - ["forwarded_port", {guest: 3306, host: 9191}]
+  - ["forwarded_port", {guest: 1186, host: 1186}]
   - ["forwarded_port", {guest: 8080, host: 8080}]
   - ["forwarded_port", {guest: 8088, host: 8088}]
   - ["forwarded_port", {guest: 8181, host: 8181}]
@@ -85,4 +86,3 @@ suites:
          private_ips: ["10.0.2.15"]
          public_ips: ["10.0.2.15"]
          vagrant: "true"
-
